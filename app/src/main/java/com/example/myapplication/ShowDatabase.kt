@@ -48,30 +48,33 @@ fun ShowDatabase(navController: NavHostController, context: Context,weatherViewM
                     }
                 }
             )
-        }
-    ) {
-        val allWeather by weatherViewModel.allWeather.observeAsState(initial = emptyList())
+        },
+        content = { innerPadding ->
+            val allWeather by weatherViewModel.allWeather.observeAsState(initial = emptyList())
 
-        LazyColumn {
-            items(allWeather) { weather ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                ) {
-                    Column(
+            LazyColumn(
+                modifier = Modifier.padding(innerPadding)
+            ) {
+                items(allWeather) { weather ->
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
+                            .padding(8.dp)
                     ) {
-                        Text(text = "Location: ${weather.location}")
-                        Text(text = "Date: ${weather.date}")
-                        Text(text = "Max Temperature: ${weather.temperature_2m_max.maxOrNull()}")
-                        Text(text = "Min Temperature: ${weather.temperature_2m_min.minOrNull()}")
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Text(text = "Location: ${weather.location}")
+                            Text(text = "Date: ${weather.date}")
+                            Text(text = "Max Temperature: ${weather.temperature_2m_max.maxOrNull()}")
+                            Text(text = "Min Temperature: ${weather.temperature_2m_min.minOrNull()}")
+                        }
                     }
                 }
             }
         }
+    )
 
-    }
 }

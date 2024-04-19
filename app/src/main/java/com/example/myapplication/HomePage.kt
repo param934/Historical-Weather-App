@@ -20,7 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
+import com.example.myapplication.Database.HistoricalWeather
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -72,10 +73,11 @@ import java.util.Locale
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun datePick(): MutableState<String> {
+fun datePick(): String {
     var showDialog by remember { mutableStateOf(false) }
 //    var location by remember { mutableStateOf("") }
     val dateState = rememberDatePickerState()
@@ -125,7 +127,7 @@ fun datePick(): MutableState<String> {
             )
         }
     }
-    return dateToString
+    return dateToString.value
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -276,13 +278,16 @@ fun parseWeatherData(jsonData: String): Map<String, String> {
 fun HomePage(navController: NavHostController, context: Context, viewModel: WeatherViewModel,weatherRepository: WeatherRepository) {
     val weatherData by viewModel.weatherData.observeAsState()
     val screenBreadth = LocalConfiguration.current.screenWidthDp.dp
+    val selectedLocation = remember { mutableStateOf<Address?>(null)}
+    var selectedDate by remember { mutableStateOf("Select Date") }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(text = "Fetch Weather Data") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.Black)
                     }
                 },
                 actions = {
@@ -324,8 +329,9 @@ fun HomePage(navController: NavHostController, context: Context, viewModel: Weat
                             Toast.makeText(context, "Loading", Toast.LENGTH_SHORT).show()
                         }
                         is Resource.Success -> {
-                            viewModel.parseJsonToHistoricalWeatherAndInsert(state.data)
+                            viewModel.parseJsonToHistoricalWeatherAndInsert(selectedLocation.value?.getAddressLine(0) ?: "", selectedDate, state.data)
                             insertdata=false
+                            Toast.makeText(context, "Weather Details stored successfully", Toast.LENGTH_SHORT).show()
                         }
                         is Resource.Error -> {
                             // Weather data loading failed
@@ -341,7 +347,6 @@ fun HomePage(navController: NavHostController, context: Context, viewModel: Weat
             FloatingActionButton(
                 onClick = {
                     insertdata=true
-
                 },
                 modifier = Modifier
                     .padding(16.dp)
@@ -368,35 +373,42 @@ fun HomePage(navController: NavHostController, context: Context, viewModel: Weat
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(66.dp))
-            val selectedLocation = remember { mutableStateOf<Address?>(null)}
-            val selectedDate: MutableState<String> = datePick()
+            selectedDate = datePick()
             Spacer(modifier = Modifier.height(16.dp))
             selectedLocation.value = getGeolocation(context)
             Spacer(modifier = Modifier.height(16.dp))
             val apiurlbase = "https://archive-api.open-meteo.com/v1/archive?"
-            val parsedDate = LocalDate.parse(selectedDate.value)
-            val apiParameters = if (parsedDate.isAfter(LocalDate.now())) {
-                // If the selected date is in the future, calculate the average of the last 10 available days' temperatures
-                val endDate = parsedDate.minusDays(1) // Exclude the selected future date
-                val startDate = endDate.minusDays(9) // Calculate the start date for the last 10 days
-                val startDateFormatted = startDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                val endDateFormatted = endDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
-
-                mapOf(
-                    "latitude" to selectedLocation.value?.latitude.toString(),
-                    "longitude" to selectedLocation.value?.longitude.toString(),
-                    "start_date" to startDateFormatted,
-                    "end_date" to endDateFormatted,
-                    "daily" to "temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,shortwave_radiation_sum",
-                    "timezone" to "auto"
-                )
-            } else {
-                // If the selected date is in the past or today, use the selected date as start and end date
+            var parsedDate: LocalDate? = null
+            try {
+                parsedDate = LocalDate.parse(selectedDate)
+            } catch (e: DateTimeParseException) {
+                // selectedDate.value is not a valid date
+            }
+            var  isAfterYesterday by remember {
+                mutableStateOf(false)
+            }
+            val yesterday = LocalDate.now().minusDays(2) // Get the date of the day before yesterday
+            val isBeforeYesterday = parsedDate?.isBefore(yesterday) ?: false
+            val apiParameters = if (isBeforeYesterday) {
+                println("isbeforeYesterday=true")
                 mapOf(
                     "latitude" to selectedLocation.value?.latitude.toString(),
                     "longitude" to selectedLocation.value?.longitude.toString(),
                     "start_date" to selectedDate,
                     "end_date" to selectedDate,
+                    "daily" to "temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,shortwave_radiation_sum",
+                    "timezone" to "auto"
+                )
+            } else {
+                val startDate = LocalDate.now().minusYears(10).toString()  // start date 10 years ago
+                val endDate = LocalDate.now().toString()  // today's date
+                println(startDate)
+                println(endDate)
+                mapOf(
+                    "latitude" to selectedLocation.value?.latitude.toString(),
+                    "longitude" to selectedLocation.value?.longitude.toString(),
+                    "start_date" to startDate,
+                    "end_date" to startDate,
                     "daily" to "temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,shortwave_radiation_sum",
                     "timezone" to "auto"
                 )
@@ -412,7 +424,7 @@ fun HomePage(navController: NavHostController, context: Context, viewModel: Weat
                     }
                 }
             }
-            if (selectedLocation.value != null && selectedDate.value.isNotEmpty()) {
+            if (selectedLocation.value != null && selectedDate.isNotEmpty()) {
                 viewModel.setDataFetched()
                 LaunchedEffect(Unit) {
                     viewModel.fetchWeatherData(apiurlbase, apiParameters)

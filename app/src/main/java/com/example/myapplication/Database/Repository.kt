@@ -1,4 +1,5 @@
 package com.example.myapplication
+import com.example.myapplication.Database.HistoricalWeather
 import org.json.JSONArray
 import org.json.JSONObject
 

@@ -48,7 +48,7 @@ fun LandingPage(navController: NavHostController, context: Context) {
         ) {
             Text(
                 text = "Plan Your Travels with Ease",
-                style = typography.titleLarge.copy(fontSize = 50.sp, fontWeight = FontWeight.Bold),
+                style = typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
@@ -61,7 +61,7 @@ fun LandingPage(navController: NavHostController, context: Context) {
         ) {
             Text(
                 text = "Easily track historical weather with our app. Access it anytime, anywhere. Never miss important weather details again!",
-                style = typography.bodyMedium.copy(fontSize = 32.sp),
+                style = typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 lineHeight = 36.sp // Adjust line spacing
             )
@@ -83,7 +83,7 @@ fun LandingPage(navController: NavHostController, context: Context) {
                 .height(60.dp),
             shape = MaterialTheme.shapes.medium,
         ) {
-            Text(text = "Get Started", style = typography.bodyMedium.copy(fontSize = 32.sp))
+            Text(text = "Get Started", style = typography.bodyLarge)
         }
     }
 }

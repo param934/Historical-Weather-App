@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.example.assi2.Database.Converters
+import com.example.myapplication.Database.HistoricalWeather
 
 @Database(entities = [HistoricalWeather::class], version = 1, exportSchema = false)
 @TypeConverters(

@@ -10,6 +10,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
+import com.example.myapplication.Database.HistoricalWeather
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -62,20 +63,20 @@ class WeatherViewModel( val weatherRepository: WeatherRepository) : ViewModel() 
         }
         return list
     }
-
          // Parse JSONObject to HistoricalWeather object
-    fun parseJsonToHistoricalWeatherAndInsert(jsonWeather: JSONObject) {
-        val location = jsonWeather.getString("location")
-        val date = jsonWeather.getString("date")
-        val temperature_2m_max = jsonArrayToList(jsonWeather.getJSONArray("temperature_2m_max")).map { it.toDouble() }
-        val temperature_2m_min = jsonArrayToList(jsonWeather.getJSONArray("temperature_2m_min")).map { it.toDouble() }
-        val sunrise = jsonArrayToList(jsonWeather.getJSONArray("sunrise"))
-        val sunset = jsonArrayToList(jsonWeather.getJSONArray("sunset"))
-        val precipitation_sum = jsonArrayToList(jsonWeather.getJSONArray("precipitation_sum")).map { it.toFloat() }
-        val shortwave_radiation_sum = jsonArrayToList(jsonWeather.getJSONArray("shortwave_radiation_sum")).map { it.toFloat() }
+    fun parseJsonToHistoricalWeatherAndInsert(location: String,date: String, jsonWeather: JSONObject) {
+//        val location = jsonWeather.getString("location")
+//        val date = jsonWeather.getString("date")
+        println(jsonWeather)
+        val dailyData = jsonWeather.getJSONObject("daily")
+        val temperature_2m_max = jsonArrayToList(dailyData.getJSONArray("temperature_2m_max")).map { it.toDouble() }
+        val temperature_2m_min = jsonArrayToList(dailyData.getJSONArray("temperature_2m_min")).map { it.toDouble() }
+        val sunrise = jsonArrayToList(dailyData.getJSONArray("sunrise"))
+        val sunset = jsonArrayToList(dailyData.getJSONArray("sunset"))
+        val precipitation_sum = jsonArrayToList(dailyData.getJSONArray("precipitation_sum")).map { it.toFloat() }
+        val shortwave_radiation_sum = jsonArrayToList(dailyData.getJSONArray("shortwave_radiation_sum")).map { it.toFloat() }
 
-
-        viewModelScope.launch{
+             viewModelScope.launch{
             weatherRepository.insertWeather(
                 HistoricalWeather(
                     location = location,
@@ -90,21 +91,43 @@ class WeatherViewModel( val weatherRepository: WeatherRepository) : ViewModel() 
             )
         }
     }
-    fun fetchWeatherData(apiUrl: String, apiParameters: Map<String, Any>) {
-       _weatherData.value= Resource.Loading("Loading Started")
+    fun fetchWeatherData(apiUrl: String, apiParameters: Map<String, Any?>) {
+        _weatherData.value = Resource.Loading("Loading Started")
         viewModelScope.launch {
             try {
-                val response = fetchWeatherFromApi(apiUrl, apiParameters)
-                    val jsonObject = JSONObject(response)
-                    println(jsonObject)
-                    if(response.isNotEmpty()){
-                        _weatherData.postValue(Resource.Success(jsonObject))
-                    }else{
-                        _weatherData.postValue(Resource.Error("Failed to fetch"))
+                // Ensure all values in apiParameters are Strings
+                val stringParameters = apiParameters.mapValues { it.value.toString() }
+                val response = fetchWeatherFromApi(apiUrl, stringParameters)
+                val isFuture=false
+                val jsonObject = JSONObject(response)
+                println(jsonObject)
+                if (response.isNotEmpty() && isFuture) {
+                    // Calculate average of max and min temperatures over the last 10 years
+                    val dailyData = jsonObject.getJSONArray("daily")
+                    var totalMaxTemp = 0.0
+                    var totalMinTemp = 0.0
+                    for (i in 0 until dailyData.length()) {
+                        val dayData = dailyData.getJSONObject(i)
+                        totalMaxTemp += dayData.getDouble("temperature_2m_max")
+                        totalMinTemp += dayData.getDouble("temperature_2m_min")
                     }
+                    val avgMaxTemp = totalMaxTemp / dailyData.length()
+                    val avgMinTemp = totalMinTemp / dailyData.length()
+
+                    // Store averages in weather data
+                    jsonObject.put("avg_max_temp_last_10_years", avgMaxTemp)
+                    jsonObject.put("avg_min_temp_last_10_years", avgMinTemp)
+
+                    _weatherData.postValue(Resource.Success(jsonObject))
+                }
+                if (response.isNotEmpty()) {
+                    _weatherData.postValue(Resource.Success(jsonObject))
+                } else {
+                    _weatherData.postValue(Resource.Error("Failed to fetch"))
+                }
             } catch (e: IOException) {
                 // Handle network error
-                _weatherData.postValue( Resource.Error("Error fetching weather data: $e"))
+                _weatherData.postValue(Resource.Error("Error fetching weather data: $e"))
             } catch (e: Exception) {
                 // Handle other errors
                 _weatherData.postValue(Resource.Error("Error: $e"))
